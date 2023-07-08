@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "strictPropertyInitialization": true,
+    "target": "es2020",
+    "outDir": "./dist",
+    "baseUrl": "./src",
+    "lib": ["es2020"]
+  },
+  "include": ["./src/**/*.ts"],
+  "exclude": ["./node_modules", "./front"]
+}
