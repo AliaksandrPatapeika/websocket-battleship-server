@@ -5,6 +5,20 @@ export interface WSData extends WebSocket {
   gameId: number;
 }
 
+export type RandomAttack = {
+  gameId: number;
+  indexPlayer: number;
+  isBot: boolean;
+};
+
+export type Attack = {
+  gameId: number;
+  x: number;
+  y: number;
+  indexPlayer: number;
+  isBot: boolean;
+};
+
 export type AddShips = {
   gameId: number;
   ships: Ship[];

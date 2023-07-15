@@ -1,6 +1,13 @@
 import WebSocket from 'ws';
 import { WSData } from './types';
-import { addShips, addUserToRoom, createRoom, reg } from './handlers';
+import {
+  addShips,
+  addUserToRoom,
+  attack,
+  createRoom,
+  randomAttack,
+  reg,
+} from './handlers';
 
 function wsApp(port: number): void {
   const wss = new WebSocket.Server({ port });
@@ -31,6 +38,16 @@ function wsApp(port: number): void {
 
           case 'add_ships': {
             addShips(ws, data);
+            break;
+          }
+
+          case 'attack': {
+            attack(wss, ws, data);
+            break;
+          }
+
+          case 'randomAttack': {
+            randomAttack(wss, ws, data);
             break;
           }
         }

@@ -1,6 +1,22 @@
 import WebSocket from 'ws';
-import { AddShips, Board, Game, Player, ShipAttack, WSData } from './types';
-import { stringifyResp } from './utils';
+import { randomInt } from 'node:crypto';
+
+import {
+  AddShips,
+  Attack,
+  Board,
+  Game,
+  Player,
+  RandomAttack,
+  ShipAttack,
+  WSData,
+} from './types';
+import {
+  convertShipCoordinatesToArray,
+  createResponses,
+  getSurroundingCoordinates,
+  stringifyResp,
+} from './utils';
 
 const players: { [key: number]: Player } = {};
 const games: { [key: number]: Game } = {};
@@ -203,6 +219,185 @@ const addShips = (ws: WSData, data: AddShips): void => {
   }
 };
 
+const attack = (wss: WebSocket.Server, ws: WSData, data: Attack): void => {
+  const { isBot, gameId, indexPlayer, x: positionX, y: positionY } = data;
+
+  // block Players Attack
+  if (!(isBot || getGame(gameId).currentPlayerIndex === ws.userId)) {
+    return;
+  }
+
+  const game = getGame(gameId);
+  const { playersBoard } = game;
+  const defenderUserId =
+    game.players[0].userId === indexPlayer
+      ? game.players[1].userId
+      : game.players[0].userId;
+
+  const board = playersBoard.get(defenderUserId) as Board;
+  let status = 'miss';
+  let killedArray: { x: number; y: number }[] = [];
+  let missedArray: { x: number; y: number }[] = [];
+  let combinedUnavailableCellArray: { x: number; y: number }[] = [];
+
+  if (board.grid[positionX][positionY] !== 0) {
+    status = 'unknown';
+  } else {
+    for (const ship of board.shipsAttack) {
+      let result = 'miss';
+
+      if (ship.x.includes(positionX) && ship.y.includes(positionY)) {
+        ship.shots += 1;
+        result = ship.length === ship.shots ? 'killed' : 'shot';
+      }
+
+      if (result === 'killed') {
+        killedArray = convertShipCoordinatesToArray(ship);
+        missedArray = getSurroundingCoordinates(killedArray);
+        combinedUnavailableCellArray = [...killedArray, ...missedArray];
+      }
+
+      if (result !== 'miss') {
+        status = result;
+        board.killedCount += result === 'killed' ? 1 : 0;
+        break;
+      }
+    }
+
+    if (combinedUnavailableCellArray.length) {
+      combinedUnavailableCellArray.forEach((cell: { x: number; y: number }) => {
+        const { x, y } = cell;
+        board.grid[x][y] = 1;
+      });
+    } else {
+      board.grid[positionX][positionY] = 1;
+    }
+  }
+
+  if (status === 'unknown') {
+    return;
+  }
+
+  let isGameOver: boolean = false;
+
+  for (const [userId, board] of playersBoard.entries()) {
+    if (board.killedCount === 10) {
+      if (game.players.length === 2) {
+        const winPlayer =
+          game.players[0].userId === userId ? game.players[1] : game.players[0];
+        winPlayer.wins += 1;
+        game.winUserId = winPlayer.userId;
+      }
+
+      isGameOver = true;
+    }
+  }
+
+  if (isGameOver) {
+    try {
+      const game = getGame(gameId);
+
+      game.players.forEach((player) => {
+        player.ws.send(stringifyResp('finish', { winPlayer: game.winUserId }));
+      });
+
+      delete games[gameId];
+    } finally {
+      broadcastMessage(
+        wss,
+        'update_winners',
+        Object.values(players).map(({ name, wins }) => ({ name, wins })),
+      );
+      broadcastMessage(
+        wss,
+        'update_room',
+        Object.values(games).map(({ gameId, players }) => ({
+          roomId: gameId,
+          roomUsers: players.map(({ name, userId }) => ({
+            name,
+            index: userId,
+          })),
+        })),
+      );
+    }
+
+    return;
+  }
+  const clients = game.players.map((player) => player.ws);
+
+  if (status === 'miss') {
+    game.currentPlayerIndex =
+      game.players[0].userId === game.currentPlayerIndex
+        ? game.players[1].userId
+        : game.players[0].userId;
+  }
+
+  const nextUserId = game.currentPlayerIndex;
+
+  if (status === 'killed') {
+    const killResponses = createResponses(indexPlayer, status, killedArray);
+    const missResponses = createResponses(indexPlayer, 'miss', missedArray);
+    const combinedResponses = [...killResponses, ...missResponses];
+
+    combinedResponses.forEach((response) => {
+      clients.forEach((ws) => {
+        ws.send(response);
+      });
+    });
+  } else {
+    const otherAttackResponse = stringifyResp('attack', {
+      position: {
+        x: positionX,
+        y: positionY,
+      },
+      currentPlayer: indexPlayer,
+      status,
+    });
+
+    clients.forEach((ws) => {
+      ws.send(otherAttackResponse);
+    });
+  }
+
+  const turnResponse = stringifyResp('turn', {
+    currentPlayer: nextUserId,
+  });
+
+  clients.forEach((ws) => {
+    ws.send(turnResponse);
+  });
+};
+
+const randomAttack = (
+  wss: WebSocket.Server,
+  ws: WSData,
+  data: RandomAttack,
+): void => {
+  const { isBot, gameId, indexPlayer } = data;
+  const game = getGame(gameId);
+
+  const defenderUserId =
+    game.players[0].userId === game.currentPlayerIndex
+      ? game.players[1].userId
+      : game.players[0].userId;
+
+  const board = game.playersBoard.get(defenderUserId) as Board;
+
+  const pull = [];
+
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 10; x++) {
+      if (board.grid[x][y] !== 1) {
+        pull.push({ x, y });
+      }
+    }
+  }
+
+  const { x, y } = pull[randomInt(0, pull.length)] || { x: 0, y: 0 };
+
+  attack(wss, ws, { isBot, gameId, x, y, indexPlayer });
+};
+
 const addPlayerEmptyBoard = (gameId: number, userId: number): void => {
   const board: Board = {
     killedCount: 0,
@@ -235,4 +430,4 @@ const broadcastMessage = (
   });
 };
 
-export { reg, createRoom, addUserToRoom, addShips };
+export { reg, createRoom, addUserToRoom, addShips, attack, randomAttack };
