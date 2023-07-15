@@ -489,53 +489,45 @@ const close = (wss: WebSocket.Server, ws: WSData): void => {
     console.log(`Close connection`);
     const { gameId, userId } = ws;
 
-    if (gameId && gameId !== 0 && userId) {
-      const game = getGame(gameId);
+    if (gameId) {
+      try {
+        const game = getGame(gameId);
 
-      if (game) {
-        game.players = game.players.filter(
-          (player) => player.userId !== userId,
-        );
-        game.playersBoard.delete(userId);
+        if (game.players.length === 2) {
+          const winPlayer =
+            game.players[0].userId === userId
+              ? game.players[1]
+              : game.players[0];
 
-        if (game.players.length === 0) {
-          delete games[gameId];
-        } else if (game.players.length === 1) {
-          const winPlayer = game.players[0];
           winPlayer.wins += 1;
           game.winUserId = winPlayer.userId;
-          game.players.length = 0;
-          delete games[gameId];
-        } else {
-          const response = stringifyResp('delete_player', {
-            roomId: gameId,
-            userId: userId,
-          });
-
           game.players.forEach((player) => {
-            player.ws.send(response);
+            player.ws.send(
+              stringifyResp('finish', { winPlayer: game.winUserId }),
+            );
           });
         }
+        delete games[gameId];
+      } finally {
+        broadcastMessage(
+          wss,
+          'update_winners',
+          Object.values(players).map(({ name, wins }) => ({ name, wins })),
+        );
+        broadcastMessage(
+          wss,
+          'update_room',
+          Object.values(games).map(({ gameId, players }) => ({
+            roomId: gameId,
+            roomUsers: players.map(({ name, userId }) => ({
+              name,
+              index: userId,
+            })),
+          })),
+        );
       }
     }
-
-    delete players[userId];
-    broadcastMessage(
-      wss,
-      'update_winners',
-      Object.values(players).map(({ name, wins }) => ({ name, wins })),
-    );
-    broadcastMessage(
-      wss,
-      'update_room',
-      Object.values(games).map(({ gameId, players }) => ({
-        roomId: gameId,
-        roomUsers: players.map(({ name, userId }) => ({ name, index: userId })),
-      })),
-    );
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) {}
 };
 
 const broadcastMessage = (
