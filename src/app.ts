@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { WSData } from './types';
-import { createRoom, reg } from './handlers';
+import { addShips, addUserToRoom, createRoom, reg } from './handlers';
 
 function wsApp(port: number): void {
   const wss = new WebSocket.Server({ port });
@@ -21,6 +21,16 @@ function wsApp(port: number): void {
 
           case 'create_room': {
             createRoom(wss, ws);
+            break;
+          }
+
+          case 'add_user_to_room': {
+            addUserToRoom(wss, ws, data);
+            break;
+          }
+
+          case 'add_ships': {
+            addShips(ws, data);
             break;
           }
         }

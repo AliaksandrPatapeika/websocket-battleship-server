@@ -5,6 +5,11 @@ export interface WSData extends WebSocket {
   gameId: number;
 }
 
+export type AddShips = {
+  gameId: number;
+  ships: Ship[];
+};
+
 export interface Player {
   ws: WSData;
   userId: number;
