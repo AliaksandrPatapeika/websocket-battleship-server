@@ -1,10 +1,11 @@
 import WebSocket from 'ws';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 
 import {
   AddShips,
   Attack,
   Board,
+  Bot,
   Game,
   Player,
   RandomAttack,
@@ -14,6 +15,7 @@ import {
 import {
   convertShipCoordinatesToArray,
   createResponses,
+  generateEnemyShips,
   getSurroundingCoordinates,
   stringifyResp,
 } from './utils';
@@ -398,6 +400,70 @@ const randomAttack = (
   attack(wss, ws, { isBot, gameId, x, y, indexPlayer });
 };
 
+const singlePlay = (wss: WebSocket.Server, ws: WSData): void => {
+  createRoom(wss, ws);
+  const { gameId } = ws;
+  const bot: Bot = {
+    name: randomUUID(),
+    password: randomUUID(),
+    readyState: 1,
+    gameId: 0,
+    userId: 0,
+    send: (payload: string): void => {
+      const message = JSON.parse(payload.toString());
+      const type = message.type;
+      const data = message.data.length > 0 ? JSON.parse(message.data) : {};
+
+      switch (type) {
+        case 'turn': {
+          if (data.currentPlayer === bot.userId) {
+            if (getGame(bot.gameId)) {
+              randomAttack(wss, wss as unknown as WSData, {
+                gameId: bot.gameId,
+                indexPlayer: bot.userId,
+                isBot: true,
+              });
+            }
+          }
+
+          break;
+        }
+      }
+    },
+  };
+  const botFakeWs = bot as unknown as WSData;
+
+  reg(wss, botFakeWs, {
+    name: bot.name,
+    password: bot.password,
+  });
+
+  addUserToRoom(wss, botFakeWs, {
+    indexRoom: gameId,
+  });
+
+  const ships = generateEnemyShips();
+
+  addShips(botFakeWs, {
+    gameId,
+    ships,
+  });
+
+  broadcastMessage(
+    wss,
+    'update_winners',
+    Object.values(players).map(({ name, wins }) => ({ name, wins })),
+  );
+  broadcastMessage(
+    wss,
+    'update_room',
+    Object.values(games).map(({ gameId, players }) => ({
+      roomId: gameId,
+      roomUsers: players.map(({ name, userId }) => ({ name, index: userId })),
+    })),
+  );
+};
+
 const addPlayerEmptyBoard = (gameId: number, userId: number): void => {
   const board: Board = {
     killedCount: 0,
@@ -418,6 +484,60 @@ const getGame = (gameId: number): Game => {
   return games[gameId];
 };
 
+const close = (wss: WebSocket.Server, ws: WSData): void => {
+  try {
+    console.log(`Close connection`);
+    const { gameId, userId } = ws;
+
+    if (gameId && gameId !== 0 && userId) {
+      const game = getGame(gameId);
+
+      if (game) {
+        game.players = game.players.filter(
+          (player) => player.userId !== userId,
+        );
+        game.playersBoard.delete(userId);
+
+        if (game.players.length === 0) {
+          delete games[gameId];
+        } else if (game.players.length === 1) {
+          const winPlayer = game.players[0];
+          winPlayer.wins += 1;
+          game.winUserId = winPlayer.userId;
+          game.players.length = 0;
+          delete games[gameId];
+        } else {
+          const response = stringifyResp('delete_player', {
+            roomId: gameId,
+            userId: userId,
+          });
+
+          game.players.forEach((player) => {
+            player.ws.send(response);
+          });
+        }
+      }
+    }
+
+    delete players[userId];
+    broadcastMessage(
+      wss,
+      'update_winners',
+      Object.values(players).map(({ name, wins }) => ({ name, wins })),
+    );
+    broadcastMessage(
+      wss,
+      'update_room',
+      Object.values(games).map(({ gameId, players }) => ({
+        roomId: gameId,
+        roomUsers: players.map(({ name, userId }) => ({ name, index: userId })),
+      })),
+    );
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 const broadcastMessage = (
   wss: WebSocket.Server,
   type: string,
@@ -430,4 +550,13 @@ const broadcastMessage = (
   });
 };
 
-export { reg, createRoom, addUserToRoom, addShips, attack, randomAttack };
+export {
+  reg,
+  createRoom,
+  addUserToRoom,
+  addShips,
+  attack,
+  randomAttack,
+  singlePlay,
+  close,
+};

@@ -1,7 +1,123 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
-import { ShipAttack } from './types';
+import { Ship, ShipAttack, ShipType } from './types';
+
+export const generateEnemyShips = (): Ship[] => {
+  const ships: Ship[] = [];
+  const shipCounts: { [key: string]: number } = {
+    huge: 1,
+    large: 2,
+    medium: 3,
+    small: 4,
+  };
+
+  const shipLengths: { [key: string]: number } = {
+    huge: 4,
+    large: 3,
+    medium: 2,
+    small: 1,
+  };
+
+  const gridLength = 10;
+  const grid: boolean[][] = Array(gridLength)
+    .fill(null)
+    .map(() => Array(gridLength).fill(false));
+
+  function checkShipPlacement(
+    x: number,
+    y: number,
+    direction: boolean,
+    length: number,
+  ): boolean {
+    const startX = direction ? x - 1 : x;
+    const startY = direction ? y - 1 : y;
+    const endX = direction ? x + 1 : x + length;
+    const endY = direction ? y + length : y + 1;
+
+    if (endX >= gridLength || endY >= gridLength) {
+      return false; // Ship exceeds the grid boundaries
+    }
+
+    for (let i = startY; i <= endY; i++) {
+      for (let j = startX; j <= endX; j++) {
+        if (!grid[i] || grid[i][j]) {
+          return false; // Ship overlaps with another ship
+        }
+      }
+    }
+
+    return true; // Ship can be placed at the given position and direction
+  }
+
+  function hasNeighboringShip(x: number, y: number): boolean {
+    const startX = x > 0 ? x - 1 : x;
+    const startY = y > 0 ? y - 1 : y;
+    const endX = x < gridLength - 1 ? x + 1 : x;
+    const endY = y < gridLength - 1 ? y + 1 : y;
+
+    for (let i = startY; i <= endY; i++) {
+      for (let j = startX; j <= endX; j++) {
+        if (grid[i][j]) {
+          return true; // There is a neighboring ship
+        }
+      }
+    }
+
+    return false; // There are no neighboring ships
+  }
+
+  function markShipCells(
+    x: number,
+    y: number,
+    direction: boolean,
+    length: number,
+  ): void {
+    const endX = direction ? x + 1 : x + length;
+    const endY = direction ? y + length : y + 1;
+
+    for (let i = y; i < endY; i++) {
+      for (let j = x; j < endX; j++) {
+        if (grid[i] && grid[i][j] !== undefined) {
+          grid[i][j] = true;
+        }
+      }
+    }
+  }
+
+  for (const type in shipCounts) {
+    const count: number = shipCounts[type];
+    const length: number = shipLengths[type];
+
+    for (let i = 0; i < count; i++) {
+      let shipPlaced = false;
+
+      while (!shipPlaced) {
+        const x = Math.floor(Math.random() * gridLength);
+        const y = Math.floor(Math.random() * gridLength);
+        const direction = Math.random() < 0.5;
+
+        if (
+          checkShipPlacement(x, y, direction, length) &&
+          !hasNeighboringShip(x, y)
+        ) {
+          ships.push({
+            position: { x, y },
+            direction,
+            type: type as ShipType,
+            length,
+          });
+
+          markShipCells(x, y, direction, length);
+          shipPlaced = true;
+        }
+      }
+    }
+  }
+
+  // console.log('SHIPS', ships);
+  return ships;
+};
 
 export const httpServer = http.createServer((req, res) => {
   const __dirname = path.resolve(path.dirname(''));

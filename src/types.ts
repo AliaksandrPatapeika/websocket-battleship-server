@@ -32,6 +32,15 @@ export interface Player {
   wins: number;
 }
 
+export interface Bot {
+  name: string;
+  password: string;
+  readyState: number;
+  userId: number;
+  gameId: number;
+  send: (payload: string) => void;
+}
+
 export interface Board {
   isBoardReady: boolean;
   killedCount: number;

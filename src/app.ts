@@ -4,9 +4,11 @@ import {
   addShips,
   addUserToRoom,
   attack,
+  close,
   createRoom,
   randomAttack,
   reg,
+  singlePlay,
 } from './handlers';
 
 function wsApp(port: number): void {
@@ -50,7 +52,16 @@ function wsApp(port: number): void {
             randomAttack(wss, ws, data);
             break;
           }
+
+          case 'single_play': {
+            singlePlay(wss, ws);
+            break;
+          }
         }
+      });
+
+      ws.on('close', () => {
+        close(wss, ws);
       });
     });
   };
