@@ -15,7 +15,7 @@
 
 **Production**
 
-`npm run start`
+`npm run star:prod`
 
 * App served @ `http://localhost:8181` without nodemon
 
@@ -25,7 +25,9 @@
 
 Command | Description
 --- | ---
-`npm run start:dev` | App served @ `http://localhost:8181` with nodemon
-`npm run start` | App served @ `http://localhost:8181` without nodemon
+`npm run start:dev` | Runs the application in development mode with nodemon.
+`npm run start:prod` | Runs the application in production mode without nodemon.
+`npm run format` | Formats the code in .ts files using Prettier.
+`npm run lint` | Runs ESLint to check the syntax and code style in .ts files.
 
 **Note**: replace `npm` with `yarn` in `package.json` if you use yarn.

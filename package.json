@@ -1,21 +1,45 @@
 {
-    "name": "ws_task",
+    "name": "websocket-battleship-server",
     "version": "1.0.0",
-    "description": "Template for the WebSocket remote control task",
-    "main": "index.js",
-    "type": "module",
+    "description": "NodeJS 2023 Q2 Assignment: Websocket battleship server",
+    "main": "./src/index.ts",
+    "exports": "./dist/index.js",
     "scripts": {
-        "start": "node ./index.js",
-        "start:dev": "nodemon ./index.js",
+        "start:dev": "nodemon --watch",
+        "star:prod": "tsc && node dist/index.js",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "lint": "eslint \"src/**/*.ts\" --fix",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
-    "author": "Andrei Auchynnikau",
-    "keywords": [],
-    "license": "ISC",
-    "devDependencies": {
-        "nodemon": "^2.0.16"
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/AliaksandrPatapeika/websocket-battleship-server.git"
     },
+    "keywords": [
+        "nodejs",
+        "assignments",
+        "websocket"
+    ],
+    "author": "Aliaksandr Patapeika",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/AliaksandrPatapeika/websocket-battleship-server/issues"
+    },
+    "homepage": "https://github.com/AliaksandrPatapeika/websocket-battleship-server#readme",
     "dependencies": {
-        "ws": "^8.8.0"
+        "ws": "^8.13.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.4.1",
+        "@types/ws": "^8.5.5",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.44.0",
+        "eslint-config-prettier": "^8.8.0",
+        "eslint-plugin-prettier": "^5.0.0",
+        "nodemon": "^3.0.1",
+        "prettier": "^3.0.0",
+        "ts-node": "^10.9.1",
+        "typescript": "^5.1.6"
     }
 }
